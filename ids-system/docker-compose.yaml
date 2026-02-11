@@ -1,0 +1,18 @@
+services:
+  event-collector:
+    build: ./event-collector
+    ports:
+      - "5001:5000"
+    depends_on:
+      - phishing-agent
+      - ransomware-agent
+      - cryptojacking-agent
+
+  phishing-agent:
+    build: ./phishing-agent
+
+  ransomware-agent:
+    build: ./ransomware-agent
+
+  cryptojacking-agent:
+    build: ./cryptojacking-agent
