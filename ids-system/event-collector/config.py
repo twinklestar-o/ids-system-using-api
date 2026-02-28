@@ -17,3 +17,8 @@ CRYPTOJACKING_AGENT_URL = os.getenv(
     "CRYPTOJACKING_AGENT_URL",
     "http://cryptojacking-agent:6003/analyze"
 )
+
+MORPHEUS_URL = os.getenv(
+    "MORPHEUS_URL",
+    "http://morpheus:7000/message"
+)

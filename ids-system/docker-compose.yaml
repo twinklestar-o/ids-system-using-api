@@ -7,12 +7,39 @@ services:
       - phishing-agent
       - ransomware-agent
       - cryptojacking-agent
+    networks:
+      - ids-network
 
   phishing-agent:
     build: ./phishing-agent
+    ports:
+      - "6001:6001"
+    networks:
+      - ids-network
 
   ransomware-agent:
     build: ./ransomware-agent
+    ports:
+      - "6002:6002"
+    networks:
+      - ids-network
 
   cryptojacking-agent:
     build: ./cryptojacking-agent
+    ports:
+      - "6003:6003"
+    networks:
+      - ids-network
+  
+  morpheus:
+    build: ./Morpheus
+    ports:
+      - "7000:7000"
+    environment:
+      - GROQ_API_KEY=${GROQ_API_KEY}
+    networks:
+      - ids-network
+
+networks:
+  ids-network:
+    driver: bridge

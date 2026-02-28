@@ -17,6 +17,7 @@ from config import (
     PHISHING_AGENT_URL,
     RANSOMWARE_AGENT_URL,
     CRYPTOJACKING_AGENT_URL,
+    MORPHEUS_URL,
 )
 
 # =========================
@@ -74,6 +75,7 @@ def forward_to_agents(event: Dict[str, Any]):
         PHISHING_AGENT_URL,
         RANSOMWARE_AGENT_URL,
         CRYPTOJACKING_AGENT_URL,
+        MORPHEUS_URL,
     ]
 
     def send(url):

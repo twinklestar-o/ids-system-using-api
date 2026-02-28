@@ -1,0 +1,63 @@
+﻿docker-compose : time=
+"2026-02-28T15:58:33+0
+7:00" level=warning 
+msg="The 
+\"GROQ_API_KEY\" 
+variable is not set. 
+Defaulting to a blank 
+string."
+At line:1 char:1
++ docker-compose run 
+morpheus 2>&1 | 
+Out-File -FilePath 
+run_logs.txt -E ...
++ ~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo    
+          : NotSpeci  
+  fied: (time="2026   
+ -02-2... blank st    
+ring.":String) []    
+, RemoteException
+    + FullyQualifiedE 
+   rrorId : NativeCo  
+  mmandError
+ 
+ Container ids-system-
+morpheus-run-aefeb813b
+9fb Creating 
+ Container ids-system-
+morpheus-run-aefeb813b
+9fb Created 
+2026-02-28 
+08:58:42,341 [INFO] 
+Starting Morpheus 
+Gemma Integration 
+Pipeline...
+2026-02-28 
+08:58:42,342 
+[WARNING] 
+GROQ_API_KEY 
+environment variable 
+is not set! LLM 
+component will fail 
+if it runs inference.
+2026-02-28 
+08:58:42,342 [INFO] 
+Initializing 
+OpenAIChatService for 
+Groq API...
+2026-02-28 
+08:58:42,709 [INFO] 
+Successfully 
+initialized LLM 
+client for model: 
+gemma-7b-it
+2026-02-28 
+08:58:42,710 [INFO] 
+Pipeline structure 
+initialized 
+successfully. Add 
+source/sink and call 
+pipeline.run() to 
+process real traffic.
