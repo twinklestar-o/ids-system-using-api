@@ -68,14 +68,21 @@ def adapt_extension_event(raw_event: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # =========================
+# Shared State for Alerts
+# =========================
+alerts_buffer = []
+buffer_lock = threading.Lock()
+
+# =========================
 # Forward to agents
 # =========================
 def forward_to_agents(event: Dict[str, Any]):
+    # Only forward to rule-based filtering agents. 
+    # Morpheus is now called by agents themselves upon detection.
     agent_urls = [
         PHISHING_AGENT_URL,
         RANSOMWARE_AGENT_URL,
         CRYPTOJACKING_AGENT_URL,
-        MORPHEUS_URL,
     ]
 
     def send(url):
@@ -87,6 +94,49 @@ def forward_to_agents(event: Dict[str, Any]):
 
     for url in agent_urls:
         threading.Thread(target=send, args=(url,), daemon=True).start()
+
+
+# =========================
+# Feedback Loop Endpoints
+# =========================
+@app.route("/notify", methods=["POST"])
+def receive_notification():
+    """Received analysis result from Morpheus."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error"}), 400
+        
+        with buffer_lock:
+            alerts_buffer.append({
+                "event_id": data.get("event_id"),
+                "analysis": data.get("analysis"),
+                "severity_label": data.get("severity_label", "[INFO]"),
+                "timestamp": datetime.now().isoformat()
+            })
+            # Keep buffer small (last 50 alerts)
+            if len(alerts_buffer) > 50:
+                alerts_buffer.pop(0)
+
+        logger.info(f"Received Morpheus notification for event {data.get('event_id')}")
+        return jsonify({"status": "received"}), 200
+    except Exception as e:
+        logger.error(f"Error in /notify: {e}")
+        return jsonify({"status": "error"}), 500
+
+@app.route("/alerts", methods=["GET"])
+def get_alerts():
+    """Endpoint for browser extension to poll for alerts."""
+    with buffer_lock:
+        # Return all pending alerts and clear the buffer for this caller
+        # (In a real system, we'd use session/tab IDs, but this is fine for a demo)
+        current_alerts = list(alerts_buffer)
+        alerts_buffer.clear()
+    
+    return jsonify({
+        "alerts": current_alerts,
+        "count": len(current_alerts)
+    }), 200
 
 
 # =========================
@@ -110,17 +160,12 @@ def validate_event(event: Dict[str, Any]):
 # =========================
 @app.route("/event", methods=["POST"])
 def receive_event():
-    print("=== REQUEST MASUK KE /event ===")
+    logger.info("=== REQUEST MASUK KE /event ===")
     try:
         if not request.is_json:
-            print("[ERROR] Request bukan JSON")
             return jsonify({"status": "rejected"}), 400
 
         raw_event = request.get_json()
-
-        print("\n========== EVENT FROM EXTENSION ==========")
-        print(json.dumps(raw_event, indent=2))
-        print("==========================================\n")
 
         # adapt ke schema internal
         raw_event = adapt_extension_event(raw_event)
@@ -128,19 +173,19 @@ def receive_event():
         # validate
         validation = validate_event(raw_event)
         if not validation["valid"]:
-            print("[ERROR] Validation gagal:", validation["error"])
+            logger.error(f"Validation gagal: {validation['error']}")
             return jsonify(validation), 400
 
         # normalize
+        event_id = raw_event.get("event_id") or raw_event.get("data", {}).get("event_id")
         normalized_event = create_normalized_event(
             event_type=raw_event["type"],
             data=raw_event["data"],
             source=EventSource.BROWSER_EXTENSION.value,
+            event_id=event_id
         )
 
-        print("\n========== NORMALIZED EVENT ==========")
-        print(json.dumps(normalized_event, indent=2))
-        print("======================================\n")
+        logger.info(f"Processing event {normalized_event['event_id']}")
 
         # forward ke agent
         forward_to_agents(normalized_event)
@@ -151,7 +196,7 @@ def receive_event():
         }), 200
 
     except Exception as e:
-        print("[FATAL ERROR]", str(e))
+        logger.error(f"Fatal error: {e}")
         return jsonify({"status": "error"}), 500
 
 

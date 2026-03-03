@@ -9,10 +9,11 @@
     "webNavigation",
     "webRequest",
     "downloads",
-    "storage"
+    "storage",
+    "notifications"
   ],
   "host_permissions": [
-    "http://localhost:5000/*",
+    "http://localhost:5001/*",
     "<all_urls>"
   ],
   "background": {
@@ -32,6 +33,16 @@
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Event Collector"
+    "default_title": "Event Collector",
+    "default_icon": {
+      "16": "icons/icon128.png",
+      "48": "icons/icon128.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon128.png",
+    "48": "icons/icon128.png",
+    "128": "icons/icon128.png"
   }
 }

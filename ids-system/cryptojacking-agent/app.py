@@ -1,6 +1,9 @@
+import requests
+import os
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
+MORPHEUS_URL = os.getenv("MORPHEUS_URL", "http://morpheus:7000/message")
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -9,11 +12,27 @@ def health():
 @app.route("/analyze", methods=["POST"])
 def analyze():
     event = request.get_json()
-
-    perf = event.get("performance_context", {})
+    data = event.get("data", {})
+    perf = data.get("performance_context") or event.get("performance_context") or {}
     cpu = perf.get("cpu_usage_percent", 0)
+    
+    # Mining pool detection
+    payload_str = str(event).lower()
+    mining_keywords = ["stratum", "pool", "monero", "xmr", "cryptonight", "xmrig"]
+    is_mining_pool = any(word in payload_str for word in mining_keywords)
 
-    is_crypto = cpu > 80
+    is_crypto = cpu > 80 or is_mining_pool
+
+    if is_crypto:
+        try:
+            requests.post(MORPHEUS_URL, json={
+                "event_id": event.get("event_id"),
+                "agent": "cryptojacking",
+                "type": "cryptojacking_detected",
+                "data": event
+            }, timeout=2)
+        except:
+            pass
 
     return jsonify({
         "agent": "cryptojacking",
