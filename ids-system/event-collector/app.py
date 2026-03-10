@@ -68,17 +68,17 @@ def adapt_extension_event(raw_event: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # =========================
-# Shared State for Alerts
+# Shared State for Alerts & Dashboard
 # =========================
 alerts_buffer = []
+dashboard_alerts = [] # Persistent for dashboard view
+stats = {"total": 0, "threats": 0, "blocks": 0}
 buffer_lock = threading.Lock()
 
 # =========================
 # Forward to agents
 # =========================
 def forward_to_agents(event: Dict[str, Any]):
-    # Only forward to rule-based filtering agents. 
-    # Morpheus is now called by agents themselves upon detection.
     agent_urls = [
         PHISHING_AGENT_URL,
         RANSOMWARE_AGENT_URL,
@@ -95,6 +95,38 @@ def forward_to_agents(event: Dict[str, Any]):
     for url in agent_urls:
         threading.Thread(target=send, args=(url,), daemon=True).start()
 
+# =========================
+# Dashboard Routes
+# =========================
+@app.route("/dashboard")
+def dashboard():
+    # Admin Access Key check
+    key = request.args.get("key")
+    if key != "rahasia123":
+        return "<h1>⚠️ Access Denied</h1><p>Gunakan Access Key yang benar (contoh: <code>?key=rahasia123</code>).</p>", 403
+
+    with open("dashboard.html", "r", encoding="utf-8") as f:
+        return f.read()
+
+@app.route("/dashboard-data")
+def dashboard_data():
+    # Load from file if memory buffer is empty (e.g. after restart)
+    global dashboard_alerts
+    if not dashboard_alerts and os.path.exists("logs/alerts.jsonlines"):
+        try:
+            with open("logs/alerts.jsonlines", "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                dashboard_alerts = [json.loads(line) for line in lines[-100:]]
+                # Re-sync basic stats
+                stats["threats"] = len(dashboard_alerts)
+                stats["blocks"] = sum(1 for a in dashboard_alerts if a.get("block_instruction"))
+        except: pass
+
+    with buffer_lock:
+        return jsonify({
+            "stats": stats,
+            "alerts": dashboard_alerts[::-1][:20] # Last 20 alerts
+        })
 
 # =========================
 # Feedback Loop Endpoints
@@ -108,17 +140,33 @@ def receive_notification():
             return jsonify({"status": "error"}), 400
         
         with buffer_lock:
-            alerts_buffer.append({
+            alert = {
                 "event_id": data.get("event_id"),
                 "analysis": data.get("analysis"),
                 "severity_label": data.get("severity_label", "[INFO]"),
+                "block_instruction": data.get("block_instruction", False),
                 "timestamp": datetime.now().isoformat()
-            })
-            # Keep buffer small (last 50 alerts)
-            if len(alerts_buffer) > 50:
-                alerts_buffer.pop(0)
+            }
+            alerts_buffer.append(alert)
+            dashboard_alerts.append(alert)
+            
+            # Update stats
+            stats["threats"] += 1
+            if alert["block_instruction"]:
+                stats["blocks"] += 1
+            
+            # Persist to file (Historical Audit Log)
+            try:
+                with open("logs/alerts.jsonlines", "a", encoding="utf-8") as f:
+                    f.write(json.dumps(alert) + "\n")
+            except Exception as e:
+                logger.error(f"Failed to persist alert: {e}")
 
-        logger.info(f"Received Morpheus notification for event {data.get('event_id')}")
+            # Keep buffers manageable
+            if len(alerts_buffer) > 50: alerts_buffer.pop(0)
+            if len(dashboard_alerts) > 100: dashboard_alerts.pop(0)
+
+        logger.info(f"Received Morpheus notification for event {data.get('event_id')} (Block: {alert['block_instruction']})")
         return jsonify({"status": "received"}), 200
     except Exception as e:
         logger.error(f"Error in /notify: {e}")
@@ -128,8 +176,6 @@ def receive_notification():
 def get_alerts():
     """Endpoint for browser extension to poll for alerts."""
     with buffer_lock:
-        # Return all pending alerts and clear the buffer for this caller
-        # (In a real system, we'd use session/tab IDs, but this is fine for a demo)
         current_alerts = list(alerts_buffer)
         alerts_buffer.clear()
     
@@ -184,6 +230,9 @@ def receive_event():
             source=EventSource.BROWSER_EXTENSION.value,
             event_id=event_id
         )
+
+        with buffer_lock:
+            stats["total"] += 1
 
         logger.info(f"Processing event {normalized_event['event_id']}")
 

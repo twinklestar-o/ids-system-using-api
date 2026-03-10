@@ -10,7 +10,8 @@
     "webRequest",
     "downloads",
     "storage",
-    "notifications"
+    "notifications",
+    "alarms"
   ],
   "host_permissions": [
     "http://localhost:5001/*",
